@@ -1,0 +1,94 @@
+pip install openpyxl
+!pip install kneed # Install the kneed package
+!pip install --upgrade scikit-learn # Upgrade scikit-learn
+!pip install --upgrade scikit-learn # Ensure scikit-learn is upgraded
+
+from IPython import get_ipython
+from IPython.display import display
+# %%
+# Importar librerías necesarias
+import pandas as pd
+import numpy as np
+from sklearn.cluster import AgglomerativeClustering
+from sklearn.metrics import silhouette_score
+from sklearn.metrics import pairwise_distances
+from scipy.spatial.distance import pdist, squareform
+from kneed import KneeLocator # Now you can import after installing
+import warnings
+
+# Ignorar warnings
+warnings.filterwarnings("ignore")
+data = pd.read_csv('//content/Formacion de Clusters integrando a signos vitales V1.xlsx - Tabla de variables (1).csv')
+data_clean = data.select_dtypes(include=[np.number]).dropna()
+
+
+from google.colab import files
+data = pd.read_csv('//content/Formacion de Clusters integrando a signos vitales V1.xlsx - Tabla de variables (1).csv')
+vital_signs_columns = ['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'FR1', 'FR2','FR3','FR4','FR5','FR6', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'TC1','TC2', 'TC3', 'TC4', 'TC5', 'TC6', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6']
+data = data[vital_signs_columns]
+print(data.head())
+data.head().to_csv('data_head.csv', index=False)  # index=False evita que se guarde el índice
+
+# Extraer columnas F1 a G6 como series de tiempo
+# Extraer columnas F1 a G6 como series de tiempo
+time_series_data = data[['F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'FR1', 'FR2','FR3','FR4','FR5','FR6', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'TC1','TC2', 'TC3', 'TC4', 'TC5', 'TC6', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6']]
+id_paciente = list(data.index)
+
+for col in ['T1', 'T2', 'T3', 'T4', 'T5', 'T6']:
+    # Split the string on '/' and take the first element (systolic) as a float
+    # You may need to adjust this logic depending on the format of your blood pressure data.
+    data[col] = data[col].str.split('/').str[0].astype(float)
+
+# Convertir a NumPy array para tslearn
+time_series_array = time_series_data.to_numpy()
+
+id_paciente = list(data.index)
+for col in ['TC1', 'TC2', 'TC3', 'TC4', 'TC5', 'TC6']:
+    data[col] = data[col].str.replace(',', '.').astype(float)
+
+# Preprocesar datos: eliminar columnas no numéricas y manejar valores nulos
+data_clean = data.select_dtypes(include=[np.number]).dropna()
+
+# Configurar parámetros
+indices = ["silhouette"]  # Métodos disponibles: 'silhouette' (alternativa a 'mcclain')
+methods = ["complete"]    # Tipos de linkage: 'ward', 'complete', 'single', etc.
+distances = ["euclidean"] # Tipos de métricas: 'euclidean', 'manhattan', etc.
+min_clusters = 2
+max_clusters = 6
+
+# Inside the loop:
+#model = AgglomerativeClustering(
+ #   n_clusters=n_clusters,
+  #  # affinity=distance, # Remove or comment out this line
+#)
+ #   linkage=method,
+ #   metric=distance  # Add metric argument
+
+# Calcular clústeres para cada configuración
+for index in indices:
+    print(f"Índice de validación: {index}")
+    for method in methods:
+        print(f"   Método de linkage: {method}")
+        for distance in distances:
+            print(f"      Métrica de distancia: {distance}")
+            scores = []
+            for n_clusters in range(min_clusters, max_clusters + 1):
+              # Clustering jerárquico
+                model = AgglomerativeClustering(
+                    n_clusters=n_clusters, 
+                   # affinity=distance, # affinity should be set to distance
+                    linkage=method,
+                    metric=distance
+                )
+                labels = model.fit_predict(data_clean)
+
+                # Calcular índice de validación (e.g., silhouette)
+                if index == "silhouette":
+                    score = silhouette_score(data_clean, labels, metric=distance)
+                    scores.append(score)
+                    print(f"         Número de clústeres: {n_clusters}, Silhouette Score: {score:.4f}")
+
+            # Determinar el mejor número de clústeres
+            kneedle = KneeLocator(range(min_clusters, max_clusters + 1), scores, curve="convex", direction="decreasing")
+            best_n_clusters = kneedle.knee
+            print(f"      Mejor número de clústeres según {index}: {best_n_clusters}")
