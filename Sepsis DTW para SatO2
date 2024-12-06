@@ -1,0 +1,42 @@
+# Para SATURACION
+
+data_fold = '/content/Saturación trayectorias.xlsx - Tabla de variables (2).csv'
+result_fold = '/content/results'
+
+
+# Crea el directorio
+os.makedirs(result_fold, exist_ok=True)
+
+data_type = 'Sat_track'
+data = pd.read_csv(data_fold)
+
+#  Aquí está el cambio:  Establecer la primera columna como índice
+data = data.set_index(data.columns[0])
+print(data.head())
+
+# Extraer columnas F1 a G6 como series de tiempo
+time_series_data = data[['S1', 'S2', 'S3', 'S4', 'S5', 'S6']]
+
+# Convertir a NumPy array para tslearn
+time_series_array = time_series_data.to_numpy()
+
+id_paciente = list(data.index)
+score_normalized = data.sub(data.min(axis=1), axis=0).div(data.max(axis=1) - data.min(axis=1), axis=0).fillna(0)
+score_normalized = np.array(score_normalized)
+
+print('running dtw....')
+start = time()
+dis = cdist_dtw(score_normalized,n_jobs=4)
+
+c_time = time() - start
+print(c_time)
+
+score_id=[id_paciente,dis]
+
+with open(os.path.join(result_fold,data_type+'.pkl'),'wb') as f:
+    pickle.dump(score_id,f)
+
+# obtaining clustermap figure
+linkage = hc.linkage(sp.distance.squareform(dis,checks=False), method='complete')
+ns_plot.savefig(result_fold+'/'+'clustermap_'+ data_type +".png", dpi = 600)
+files.download(result_fold + '/' + 'clustermap_' + data_type + ".png")
